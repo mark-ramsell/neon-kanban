@@ -40,7 +40,8 @@ export function ThemeProvider({
       'green',
       'blue',
       'orange',
-      'red'
+      'red',
+      'neon'
     );
 
     if (theme === ThemeMode.SYSTEM) {
