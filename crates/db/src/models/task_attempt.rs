@@ -42,6 +42,7 @@ pub struct TaskAttempt {
     pub base_branch: String,           // Base branch this attempt is based on
     pub profile: String, // Name of the base coding agent to use ("AMP", "CLAUDE_CODE",
     // "GEMINI", etc.)
+    pub task_type: Option<String>,     // Type of task (feature, bugfix, hotfix, chore, etc.)
     pub worktree_deleted: bool, // Flag indicating if worktree has been cleaned up
     pub setup_completed_at: Option<DateTime<Utc>>, // When setup script was last completed
     pub created_at: DateTime<Utc>,
@@ -82,6 +83,7 @@ pub struct TaskAttemptContext {
 pub struct CreateTaskAttempt {
     pub profile: String,
     pub base_branch: String,
+    pub task_type: Option<String>,
 }
 
 impl TaskAttempt {
@@ -103,6 +105,7 @@ impl TaskAttempt {
                               branch,
                               base_branch,
                               profile AS "profile!",
+                              task_type,
                               worktree_deleted AS "worktree_deleted!: bool",
                               setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                               created_at AS "created_at!: DateTime<Utc>",
@@ -123,6 +126,7 @@ impl TaskAttempt {
                               branch,
                               base_branch,
                               profile AS "profile!",
+                              task_type,
                               worktree_deleted AS "worktree_deleted!: bool",
                               setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                               created_at AS "created_at!: DateTime<Utc>",
@@ -154,6 +158,7 @@ impl TaskAttempt {
                        ta.branch,
                        ta.base_branch,
                        ta.profile AS "profile!",
+                       ta.task_type,
                        ta.worktree_deleted  AS "worktree_deleted!: bool",
                        ta.setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        ta.created_at        AS "created_at!: DateTime<Utc>",
@@ -244,6 +249,7 @@ impl TaskAttempt {
                        branch,
                        base_branch,
                        profile AS "profile!",
+                       task_type,
                        worktree_deleted  AS "worktree_deleted!: bool",
                        setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        created_at        AS "created_at!: DateTime<Utc>",
@@ -265,6 +271,7 @@ impl TaskAttempt {
                        branch,
                        base_branch,
                        profile AS "profile!",
+                       task_type,
                        worktree_deleted  AS "worktree_deleted!: bool",
                        setup_completed_at AS "setup_completed_at: DateTime<Utc>",
                        created_at        AS "created_at!: DateTime<Utc>",
@@ -387,15 +394,16 @@ impl TaskAttempt {
         // Insert the record into the database
         Ok(sqlx::query_as!(
             TaskAttempt,
-            r#"INSERT INTO task_attempts (id, task_id, container_ref, branch, base_branch, profile, worktree_deleted, setup_completed_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-               RETURNING id as "id!: Uuid", task_id as "task_id!: Uuid", container_ref, branch, base_branch, profile as "profile!",  worktree_deleted as "worktree_deleted!: bool", setup_completed_at as "setup_completed_at: DateTime<Utc>", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+            r#"INSERT INTO task_attempts (id, task_id, container_ref, branch, base_branch, profile, task_type, worktree_deleted, setup_completed_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING id as "id!: Uuid", task_id as "task_id!: Uuid", container_ref, branch, base_branch, profile as "profile!", task_type, worktree_deleted as "worktree_deleted!: bool", setup_completed_at as "setup_completed_at: DateTime<Utc>", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             attempt_id,
             task_id,
             Option::<String>::None, // Container isn't known yet
             Option::<String>::None, // branch name isn't known yet
             data.base_branch,
             data.profile,
+            data.task_type,
             false, // worktree_deleted is false during creation
             Option::<DateTime<Utc>>::None // setup_completed_at is None during creation
         )

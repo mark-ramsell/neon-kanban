@@ -122,6 +122,7 @@ pub async fn create_task_and_start(
         &CreateTaskAttempt {
             profile: profile_label.clone(),
             base_branch: branch,
+            task_type: None,
         },
         task.id,
     )

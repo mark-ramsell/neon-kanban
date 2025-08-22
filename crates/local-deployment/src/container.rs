@@ -444,6 +444,17 @@ impl LocalContainerService {
         let task_title_id = git_branch_id(task_title);
         format!("vk-{}-{}", short_uuid(attempt_id), task_title_id)
     }
+    
+    pub fn dir_name_from_task_attempt_with_prefix(
+        attempt_id: &Uuid, 
+        task_title: &str, 
+        project: &db::models::project::Project, 
+        task_type: Option<&str>
+    ) -> String {
+        let task_title_id = git_branch_id(task_title);
+        let prefix = project.branch_prefix_config.get_prefix(task_type.unwrap_or("default"));
+        format!("{}-{}-{}", prefix, short_uuid(attempt_id), task_title_id)
+    }
 
     async fn track_child_msgs_in_store(&self, id: Uuid, child: &mut AsyncGroupChild) {
         let store = Arc::new(MsgStore::new());
@@ -699,14 +710,18 @@ impl ContainerService for LocalContainerService {
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
 
-        let task_branch_name =
-            LocalContainerService::dir_name_from_task_attempt(&task_attempt.id, &task.title);
-        let worktree_path = WorktreeManager::get_worktree_base_dir().join(&task_branch_name);
-
         let project = task
             .parent_project(&self.db.pool)
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
+            
+        let task_branch_name = LocalContainerService::dir_name_from_task_attempt_with_prefix(
+            &task_attempt.id, 
+            &task.title,
+            &project,
+            task_attempt.task_type.as_deref()
+        );
+        let worktree_path = WorktreeManager::get_worktree_base_dir().join(&task_branch_name);
 
         WorktreeManager::create_worktree(
             &project.git_repo_path,

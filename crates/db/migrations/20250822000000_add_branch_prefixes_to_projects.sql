@@ -1,0 +1,2 @@
+-- Add branch prefix configuration to projects table
+ALTER TABLE projects ADD COLUMN branch_prefix_config TEXT DEFAULT '{"feature":"feature","bugfix":"bugfix","hotfix":"hotfix","chore":"chore","default":"vk"}';

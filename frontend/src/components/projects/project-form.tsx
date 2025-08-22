@@ -102,6 +102,7 @@ export function ProjectForm({
           dev_script: devScript.trim() || null,
           cleanup_script: cleanupScript.trim() || null,
           copy_files: copyFiles.trim() || null,
+          branch_prefix_config: null,
         };
 
         await projectsApi.update(project.id, updateData);
@@ -140,6 +141,7 @@ export function ProjectForm({
           dev_script: devScript.trim() || null,
           cleanup_script: cleanupScript.trim() || null,
           copy_files: copyFiles.trim() || null,
+          branch_prefix_config: null,
         };
 
         await projectsApi.create(createData);

@@ -64,6 +64,15 @@ function CreateAttempt({
   const [pendingBaseBranch, setPendingBaseBranch] = useState<
     string | undefined
   >(undefined);
+  
+  const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null);
+  
+  const taskTypes = [
+    { value: 'feature', label: 'Feature' },
+    { value: 'bugfix', label: 'Bug Fix' },
+    { value: 'hotfix', label: 'Hot Fix' },
+    { value: 'chore', label: 'Chore' },
+  ];
 
   // Create attempt logic
   const actuallyCreateAttempt = useCallback(
@@ -78,6 +87,7 @@ function CreateAttempt({
         task_id: task.id,
         profile_variant_label: profile,
         base_branch: effectiveBaseBranch,
+        task_type: selectedTaskType,
       });
       fetchTaskAttempts();
     },
@@ -167,7 +177,7 @@ function CreateAttempt({
           </label>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 items-end">
+        <div className="grid grid-cols-4 gap-3 items-end">
           {/* Step 1: Choose Base Branch */}
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -312,7 +322,47 @@ function CreateAttempt({
             </div>
           </div>
 
-          {/* Step 3: Start Attempt */}
+          {/* Step 3: Task Type */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Task Type
+              </label>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 justify-between text-xs"
+                >
+                  <span className="truncate">
+                    {taskTypes.find(t => t.value === selectedTaskType)?.label || 'Default'}
+                  </span>
+                  <ArrowDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-full">
+                <DropdownMenuItem
+                  onClick={() => setSelectedTaskType(null)}
+                  className={!selectedTaskType ? 'bg-accent' : ''}
+                >
+                  Default
+                </DropdownMenuItem>
+                {taskTypes.map((taskType) => (
+                  <DropdownMenuItem
+                    key={taskType.value}
+                    onClick={() => setSelectedTaskType(taskType.value)}
+                    className={selectedTaskType === taskType.value ? 'bg-accent' : ''}
+                  >
+                    {taskType.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Step 4: Start Attempt */}
           <div className="space-y-1">
             <Button
               onClick={handleCreateAttempt}

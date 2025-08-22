@@ -182,23 +182,41 @@ pub async fn update_project(
         dev_script,
         cleanup_script,
         copy_files,
+        branch_prefix_config,
     } = payload;
 
     let name = name.unwrap_or(existing_project.name);
     let git_repo_path =
         git_repo_path.unwrap_or(existing_project.git_repo_path.to_string_lossy().to_string());
 
-    match Project::update(
-        &deployment.db().pool,
-        existing_project.id,
-        name,
-        git_repo_path,
-        setup_script,
-        dev_script,
-        cleanup_script,
-        copy_files,
-    )
-    .await
+    let result = if branch_prefix_config.is_some() {
+        Project::update_with_branch_config(
+            &deployment.db().pool,
+            existing_project.id,
+            name,
+            git_repo_path,
+            setup_script,
+            dev_script,
+            cleanup_script,
+            copy_files,
+            branch_prefix_config,
+        )
+        .await
+    } else {
+        Project::update(
+            &deployment.db().pool,
+            existing_project.id,
+            name,
+            git_repo_path,
+            setup_script,
+            dev_script,
+            cleanup_script,
+            copy_files,
+        )
+        .await
+    };
+    
+    match result
     {
         Ok(project) => Ok(ResponseJson(ApiResponse::success(project))),
         Err(e) => {

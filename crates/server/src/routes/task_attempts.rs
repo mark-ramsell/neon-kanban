@@ -27,7 +27,6 @@ use executors::{
     profile::{ProfileConfigs, ProfileVariantLabel},
 };
 use futures_util::TryStreamExt;
-use local_deployment::container;
 use serde::{Deserialize, Serialize};
 use services::services::{
     container::ContainerService,
@@ -86,6 +85,7 @@ pub struct CreateTaskAttemptBody {
     pub task_id: Uuid,
     pub profile_variant_label: Option<ProfileVariantLabel>,
     pub base_branch: String,
+    pub task_type: Option<String>,
 }
 
 #[axum::debug_handler]
@@ -112,6 +112,7 @@ pub async fn create_task_attempt(
         &CreateTaskAttempt {
             profile: profile.default.label.clone(),
             base_branch: payload.base_branch,
+            task_type: payload.task_type,
         },
         payload.task_id,
     )
