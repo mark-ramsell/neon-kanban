@@ -36,7 +36,16 @@ export const JSONEditor: React.FC<JSONEditorProps> = ({
         ? 'dark'
         : 'light';
     }
-    return theme === ThemeMode.DARK ? 'dark' : 'light';
+    // Use dark theme for dark-background themes
+    return theme === ThemeMode.DARK || 
+           theme === ThemeMode.NEON || 
+           theme === ThemeMode.PURPLE || 
+           theme === ThemeMode.GREEN || 
+           theme === ThemeMode.BLUE || 
+           theme === ThemeMode.ORANGE || 
+           theme === ThemeMode.RED
+      ? 'dark' 
+      : 'light';
   };
 
   // Avoid SSR errors
