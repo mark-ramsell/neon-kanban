@@ -31,6 +31,24 @@ export function ThemeToggle() {
         <DropdownMenuItem onClick={() => setTheme(ThemeMode.SYSTEM)}>
           System
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.PURPLE)}>
+          Purple
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.GREEN)}>
+          Green
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.BLUE)}>
+          Blue
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.ORANGE)}>
+          Orange
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.RED)}>
+          Red
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme(ThemeMode.NEON)}>
+          Neon
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
