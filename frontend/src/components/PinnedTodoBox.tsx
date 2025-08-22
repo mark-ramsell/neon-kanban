@@ -33,6 +33,20 @@ export const PinnedTodoBox: React.FC<PinnedTodoBoxProps> = ({ todos }) => {
 
   if (todos.length === 0) return null;
 
+  const getCurrentOrFinalTodo = () => {
+    const inProgressTodo = todos.find(todo => todo.status.toLowerCase() === 'in_progress' || todo.status.toLowerCase() === 'in-progress');
+    if (inProgressTodo) return inProgressTodo;
+    
+    const completedTodos = todos.filter(todo => todo.status.toLowerCase() === 'completed');
+    if (completedTodos.length > 0) {
+      return completedTodos[completedTodos.length - 1];
+    }
+    
+    return todos[todos.length - 1];
+  };
+
+  const displayTodo = getCurrentOrFinalTodo();
+
   return (
     <div className="sticky top-0 z-10 border-b bg-muted/20">
       {isCollapsed && (
@@ -40,11 +54,13 @@ export const PinnedTodoBox: React.FC<PinnedTodoBoxProps> = ({ todos }) => {
           className="flex items-center justify-between px-4 py-2 cursor-pointer"
           onClick={() => setIsCollapsed(!isCollapsed)}
         >
-          <div className="flex items-center gap-2">
-            <CircleCheck className="h-4 w-4 text-primary" />
-            <span className="text-sm text-primary">TODOs</span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {getStatusIcon(displayTodo.status)}
+            <span className="text-sm text-primary truncate">
+              {displayTodo.content}
+            </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ChevronDown className="h-4 w-4 text-primary" />
           </div>
         </div>
