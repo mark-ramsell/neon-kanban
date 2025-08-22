@@ -309,6 +309,7 @@ export function ProjectTasks() {
           title: task.title,
           description: task.description,
           status: newStatus,
+          task_type: task.task_type,
           parent_task_attempt: task.parent_task_attempt,
           image_ids: null,
         });
