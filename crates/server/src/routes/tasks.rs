@@ -153,6 +153,7 @@ pub async fn create_task_and_start(
         description: task.description,
         project_id: task.project_id,
         status: task.status,
+        task_type: task.task_type,
         parent_task_attempt: task.parent_task_attempt,
         created_at: task.created_at,
         updated_at: task.updated_at,
@@ -172,6 +173,7 @@ pub async fn update_task(
     let title = payload.title.unwrap_or(existing_task.title);
     let description = payload.description.or(existing_task.description);
     let status = payload.status.unwrap_or(existing_task.status);
+    let task_type = payload.task_type.unwrap_or(existing_task.task_type);
     let parent_task_attempt = payload
         .parent_task_attempt
         .or(existing_task.parent_task_attempt);
@@ -183,6 +185,7 @@ pub async fn update_task(
         title,
         description,
         status,
+        task_type,
         parent_task_attempt,
     )
     .await?;

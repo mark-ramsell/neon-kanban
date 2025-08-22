@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { templatesApi, imagesApi } from '@/lib/api';
-import type { TaskStatus, TaskTemplate, ImageResponse } from 'shared/types';
+import type { TaskStatus, TaskType, TaskTemplate, ImageResponse } from 'shared/types';
 
 interface Task {
   id: string;
@@ -27,6 +27,7 @@ interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  task_type: TaskType;
   created_at: string;
   updated_at: string;
 }
@@ -40,17 +41,20 @@ interface TaskFormDialogProps {
   onCreateTask?: (
     title: string,
     description: string,
+    taskType: TaskType,
     imageIds?: string[]
   ) => Promise<void>;
   onCreateAndStartTask?: (
     title: string,
     description: string,
+    taskType: TaskType,
     imageIds?: string[]
   ) => Promise<void>;
   onUpdateTask?: (
     title: string,
     description: string,
     status: TaskStatus,
+    taskType: TaskType,
     imageIds?: string[]
   ) => Promise<void>;
 }
@@ -68,6 +72,7 @@ export function TaskFormDialog({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TaskStatus>('todo');
+  const [taskType, setTaskType] = useState<TaskType>('feature');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingAndStart, setIsSubmittingAndStart] = useState(false);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
@@ -91,10 +96,11 @@ export function TaskFormDialog({
       const descriptionChanged =
         (description || '').trim() !== (task.description || '').trim();
       const statusChanged = status !== task.status;
-      return titleChanged || descriptionChanged || statusChanged;
+      const taskTypeChanged = taskType !== task.task_type;
+      return titleChanged || descriptionChanged || statusChanged || taskTypeChanged;
     }
     return false;
-  }, [title, description, status, isEditMode, task]);
+  }, [title, description, status, taskType, isEditMode, task]);
 
   // Warn on browser/tab close if there are unsaved changes
   useEffect(() => {
@@ -121,6 +127,7 @@ export function TaskFormDialog({
       setTitle(task.title);
       setDescription(task.description || '');
       setStatus(task.status);
+      setTaskType(task.task_type);
 
       // Load existing images for the task
       if (isOpen) {
@@ -137,12 +144,14 @@ export function TaskFormDialog({
       setTitle(initialTemplate.title);
       setDescription(initialTemplate.description || '');
       setStatus('todo');
+      setTaskType('feature');
       setSelectedTemplate('');
     } else {
       // Create mode - reset to defaults
       setTitle('');
       setDescription('');
       setStatus('todo');
+      setTaskType('feature');
       setSelectedTemplate('');
       setImages([]);
       setNewlyUploadedImageIds([]);
@@ -177,6 +186,7 @@ export function TaskFormDialog({
       if (template) {
         setTitle(template.title);
         setDescription(template.description || '');
+        // Keep taskType unchanged when using template
       }
     }
   };
@@ -222,9 +232,9 @@ export function TaskFormDialog({
       }
 
       if (isEditMode && onUpdateTask) {
-        await onUpdateTask(title, description, status, imageIds);
+        await onUpdateTask(title, description, status, taskType, imageIds);
       } else if (!isEditMode && onCreateTask) {
-        await onCreateTask(title, description, imageIds);
+        await onCreateTask(title, description, taskType, imageIds);
       }
 
       // Reset form on successful creation
@@ -232,6 +242,7 @@ export function TaskFormDialog({
         setTitle('');
         setDescription('');
         setStatus('todo');
+        setTaskType('feature');
         setImages([]);
         setNewlyUploadedImageIds([]);
       }
@@ -244,6 +255,7 @@ export function TaskFormDialog({
     title,
     description,
     status,
+    taskType,
     isEditMode,
     onCreateTask,
     onUpdateTask,
@@ -260,13 +272,14 @@ export function TaskFormDialog({
       if (!isEditMode && onCreateAndStartTask) {
         const imageIds =
           newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : undefined;
-        await onCreateAndStartTask(title, description, imageIds);
+        await onCreateAndStartTask(title, description, taskType, imageIds);
       }
 
       // Reset form on successful creation
       setTitle('');
       setDescription('');
       setStatus('todo');
+      setTaskType('feature');
       setImages([]);
       setNewlyUploadedImageIds([]);
 
@@ -277,6 +290,7 @@ export function TaskFormDialog({
   }, [
     title,
     description,
+    taskType,
     isEditMode,
     onCreateAndStartTask,
     onOpenChange,
@@ -397,6 +411,27 @@ export function TaskFormDialog({
                 disabled={isSubmitting || isSubmittingAndStart}
                 projectId={projectId}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="task-type" className="text-sm font-medium">
+                Type
+              </Label>
+              <Select
+                value={taskType}
+                onValueChange={(value) => setTaskType(value as TaskType)}
+                disabled={isSubmitting || isSubmittingAndStart}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="feature">Feature</SelectItem>
+                  <SelectItem value="bugfix">Bug Fix</SelectItem>
+                  <SelectItem value="hotfix">Hotfix</SelectItem>
+                  <SelectItem value="chore">Chore</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <ImageUploadSection

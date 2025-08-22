@@ -440,9 +440,15 @@ impl LocalContainerService {
         })
     }
 
-    pub fn dir_name_from_task_attempt(attempt_id: &Uuid, task_title: &str) -> String {
+    pub fn dir_name_from_task_attempt(attempt_id: &Uuid, task_title: &str, task_type: &db::models::task::TaskType) -> String {
         let task_title_id = git_branch_id(task_title);
-        format!("vk-{}-{}", short_uuid(attempt_id), task_title_id)
+        let task_type_prefix = match task_type {
+            db::models::task::TaskType::Feature => "feature",
+            db::models::task::TaskType::Bugfix => "bugfix",
+            db::models::task::TaskType::Hotfix => "hotfix",
+            db::models::task::TaskType::Chore => "chore",
+        };
+        format!("{}/vk-{}-{}", task_type_prefix, short_uuid(attempt_id), task_title_id)
     }
 
     async fn track_child_msgs_in_store(&self, id: Uuid, child: &mut AsyncGroupChild) {
@@ -700,7 +706,7 @@ impl ContainerService for LocalContainerService {
             .ok_or(sqlx::Error::RowNotFound)?;
 
         let task_branch_name =
-            LocalContainerService::dir_name_from_task_attempt(&task_attempt.id, &task.title);
+            LocalContainerService::dir_name_from_task_attempt(&task_attempt.id, &task.title, &task.task_type);
         let worktree_path = WorktreeManager::get_worktree_base_dir().join(&task_branch_name);
 
         let project = task

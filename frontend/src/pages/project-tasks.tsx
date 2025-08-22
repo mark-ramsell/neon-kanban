@@ -34,6 +34,7 @@ import TaskKanbanBoard from '@/components/tasks/TaskKanbanBoard';
 import { TaskDetailsPanel } from '@/components/tasks/TaskDetailsPanel';
 import type {
   TaskStatus,
+  TaskType,
   TaskWithAttemptStatus,
   Project,
   TaskTemplate,
@@ -169,12 +170,13 @@ export function ProjectTasks() {
   );
 
   const handleCreateTask = useCallback(
-    async (title: string, description: string, imageIds?: string[]) => {
+    async (title: string, description: string, taskType: TaskType, imageIds?: string[]) => {
       try {
         const createdTask = await tasksApi.create({
           project_id: projectId!,
           title,
           description: description || null,
+          task_type: taskType,
           parent_task_attempt: null,
           image_ids: imageIds || null,
         });
@@ -191,12 +193,13 @@ export function ProjectTasks() {
   );
 
   const handleCreateAndStartTask = useCallback(
-    async (title: string, description: string, imageIds?: string[]) => {
+    async (title: string, description: string, taskType: TaskType, imageIds?: string[]) => {
       try {
         const payload: CreateTask = {
           project_id: projectId!,
           title,
           description: description || null,
+          task_type: taskType,
           parent_task_attempt: null,
           image_ids: imageIds || null,
         };
@@ -216,6 +219,7 @@ export function ProjectTasks() {
       title: string,
       description: string,
       status: TaskStatus,
+      taskType: TaskType,
       imageIds?: string[]
     ) => {
       if (!editingTask) return;
@@ -225,6 +229,7 @@ export function ProjectTasks() {
           title,
           description: description || null,
           status,
+          task_type: taskType,
           parent_task_attempt: null,
           image_ids: imageIds || null,
         });

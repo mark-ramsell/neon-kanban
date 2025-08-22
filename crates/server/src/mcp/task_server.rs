@@ -268,6 +268,7 @@ impl TaskServer {
             project_id: project_uuid,
             title: title.clone(),
             description: description.clone(),
+            task_type: db::models::task::TaskType::Feature, // Default to feature for MCP
             parent_task_attempt: None,
             image_ids: None,
         };
@@ -571,6 +572,7 @@ impl TaskServer {
         let new_title = title.unwrap_or(current_task.title);
         let new_description = description.or(current_task.description);
         let new_status = status_enum.unwrap_or(current_task.status);
+        let new_task_type = current_task.task_type; // Keep existing task type
         let new_parent_task_attempt = current_task.parent_task_attempt;
 
         match Task::update(
@@ -580,6 +582,7 @@ impl TaskServer {
             new_title,
             new_description,
             new_status,
+            new_task_type,
             new_parent_task_attempt,
         )
         .await
