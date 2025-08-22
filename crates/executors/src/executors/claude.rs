@@ -78,19 +78,40 @@ impl StandardCodingAgentExecutor for ClaudeCode {
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
         
-        // Determine what to resume with - provided session ID or fallback to most recent
+        // Determine what to resume with - provided session ID (if valid) or fallback to most recent
         let effective_session_id = if session_id.is_empty() {
             // No session ID provided, try to find most recent session ID from conversation files
             if let Some(fallback_session_id) = self.find_most_recent_session_id(current_dir) {
-                tracing::info!("No session ID provided, using session ID from most recent conversation: {}", fallback_session_id);
+                tracing::info!(
+                    "No session ID provided, using session ID from most recent conversation: {}",
+                    fallback_session_id
+                );
                 fallback_session_id
             } else {
-                tracing::warn!("No session ID provided and no recent conversation files found, starting fresh conversation");
+                tracing::warn!(
+                    "No session ID provided and no recent conversation files found, starting fresh conversation"
+                );
                 // Return empty string to indicate no session to resume
                 "".to_string()
             }
-        } else {
+        } else if self.session_id_exists_in_project(current_dir, session_id) {
+            // We have a session id and it exists in the current project's conversation files
             session_id.to_string()
+        } else {
+            // Provided session id appears to be stale or from another project
+            // Try to heal by resuming the most recent conversation for this project
+            if let Some(fallback_session_id) = self.find_most_recent_session_id(current_dir) {
+                tracing::info!(
+                    "Provided session ID not found; using session ID from most recent conversation: {}",
+                    fallback_session_id
+                );
+                fallback_session_id
+            } else {
+                tracing::warn!(
+                    "Provided session ID not found and no recent conversation files found, starting fresh conversation"
+                );
+                "".to_string()
+            }
         };
         
         // Build resume arguments - either with session ID or empty for fresh start
@@ -148,6 +169,114 @@ impl StandardCodingAgentExecutor for ClaudeCode {
 }
 
 impl ClaudeCode {
+    /// Check whether the given session_id exists in any JSONL conversation file
+    /// for the claude project that corresponds to the provided current_dir.
+    fn session_id_exists_in_project(&self, current_dir: &PathBuf, target_session_id: &str) -> bool {
+        let home_dir = match dirs::home_dir() {
+            Some(h) => h,
+            None => return false,
+        };
+        let claude_projects_dir = home_dir.join(".claude").join("projects");
+        if !claude_projects_dir.exists() {
+            return false;
+        }
+
+        // First pass: try to find matches by directory naming convention (best effort)
+        let current_dir_normalized = current_dir
+            .to_string_lossy()
+            .replace('/', "-")
+            .replace(' ', "-");
+
+        let mut candidate_files: Vec<PathBuf> = Vec::new();
+        if let Ok(entries) = fs::read_dir(&claude_projects_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                    if dir_name.contains(&current_dir_normalized) {
+                        if let Ok(jsonl_entries) = fs::read_dir(&path) {
+                            for jsonl_entry in jsonl_entries.flatten() {
+                                let jsonl_path = jsonl_entry.path();
+                                if jsonl_path
+                                    .extension()
+                                    .and_then(|s| s.to_str())
+                                    == Some("jsonl")
+                                {
+                                    candidate_files.push(jsonl_path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no candidates by name, fall back to scanning all projects and filtering by `cwd` in file content
+        if candidate_files.is_empty() {
+            if let Ok(entries) = fs::read_dir(&claude_projects_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    if let Ok(jsonl_entries) = fs::read_dir(&path) {
+                        for jsonl_entry in jsonl_entries.flatten() {
+                            let jsonl_path = jsonl_entry.path();
+                            if jsonl_path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                                if Self::jsonl_matches_cwd(&jsonl_path, current_dir) {
+                                    candidate_files.push(jsonl_path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for file in candidate_files {
+            if Self::jsonl_contains_session_id(&file, target_session_id) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Quick check: does the JSONL file contain an entry with the given session id?
+    fn jsonl_contains_session_id(file_path: &PathBuf, target_session_id: &str) -> bool {
+        if let Ok(content) = fs::read_to_string(file_path) {
+            for line in content.lines() {
+                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
+                    if json_value
+                        .get("sessionId")
+                        .and_then(|v| v.as_str())
+                        == Some(target_session_id)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check whether a JSONL file belongs to current_dir by comparing its `cwd` field (if present)
+    fn jsonl_matches_cwd(file_path: &PathBuf, current_dir: &PathBuf) -> bool {
+        if let Ok(content) = fs::read_to_string(file_path) {
+            let current_dir_str = current_dir.to_string_lossy();
+            for line in content.lines() {
+                if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
+                    if let Some(cwd) = json_value.get("cwd").and_then(|v| v.as_str()) {
+                        if cwd == current_dir_str {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
     /// Spawn a follow-up command with fallback to most recent session ID if the provided session ID fails
     pub async fn spawn_follow_up_with_fallback(
         &self,
@@ -186,25 +315,45 @@ impl ClaudeCode {
             return None;
         }
 
-        // Create a normalized directory name for matching
+        // Phase 1: try by directory naming convention (best effort)
         let current_dir_normalized = current_dir
             .to_string_lossy()
-            .replace("/", "-")
-            .replace(" ", "-");
-        
+            .replace('/', "-")
+            .replace(' ', "-");
         let mut matching_files = Vec::new();
-        
         if let Ok(entries) = fs::read_dir(&claude_projects_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                    // Check if this directory matches our current directory pattern
                     if dir_name.contains(&current_dir_normalized) {
-                        // Look for JSONL files in this directory
                         if let Ok(jsonl_entries) = fs::read_dir(&path) {
                             for jsonl_entry in jsonl_entries.flatten() {
                                 let jsonl_path = jsonl_entry.path();
-                                if jsonl_path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                                if jsonl_path.extension().and_then(|s| s.to_str()) == Some("jsonl")
+                                {
+                                    if let Ok(metadata) = jsonl_entry.metadata() {
+                                        if let Ok(modified) = metadata.modified() {
+                                            matching_files.push((jsonl_path, modified));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Phase 2: if nothing matched, scan all projects and include files whose `cwd` matches current_dir
+        if matching_files.is_empty() {
+            if let Ok(entries) = fs::read_dir(&claude_projects_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Ok(jsonl_entries) = fs::read_dir(&path) {
+                        for jsonl_entry in jsonl_entries.flatten() {
+                            let jsonl_path = jsonl_entry.path();
+                            if jsonl_path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                                if Self::jsonl_matches_cwd(&jsonl_path, current_dir) {
                                     if let Ok(metadata) = jsonl_entry.metadata() {
                                         if let Ok(modified) = metadata.modified() {
                                             matching_files.push((jsonl_path, modified));
