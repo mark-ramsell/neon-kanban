@@ -91,7 +91,7 @@ const getContentClassName = (entryType: NormalizedEntryType) => {
   }
 
   if (entryType.type === 'error_message') {
-    return `${baseClasses} text-red-600 font-mono bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded`;
+    return `${baseClasses} text-destructive font-mono bg-destructive/10 px-2 py-1 rounded`;
   }
 
   // Special styling for TODO lists
@@ -105,7 +105,7 @@ const getContentClassName = (entryType: NormalizedEntryType) => {
           entryType.tool_name.toLowerCase() === 'todo_read' ||
           entryType.tool_name.toLowerCase() === 'todo')))
   ) {
-    return `${baseClasses} font-mono text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900/40 px-2 py-1 rounded`;
+    return `${baseClasses} font-mono text-muted-foreground bg-muted px-2 py-1 rounded`;
   }
 
   // Special styling for plan presentations
@@ -113,7 +113,7 @@ const getContentClassName = (entryType: NormalizedEntryType) => {
     entryType.type === 'tool_use' &&
     entryType.action_type.action === 'plan_presentation'
   ) {
-    return `${baseClasses} text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/20 px-3 py-2 rounded-md border-l-4 border-blue-400`;
+    return `${baseClasses} text-info-foreground bg-info/10 px-3 py-2 rounded-md border-l-4 border-info`;
   }
 
   return baseClasses;
