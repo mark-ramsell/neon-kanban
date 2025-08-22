@@ -37,7 +37,7 @@ export function Logo({ className = '' }: { className?: string }) {
       fill="url(#neonPurple)"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
-      style={{ filter: 'drop-shadow(0 0 8px #a855f7) drop-shadow(0 0 16px #a855f7)' }}
+      style={{ filter: 'drop-shadow(0 0 4px #a855f7) drop-shadow(0 0 8px #a855f750)' }}
     >
       <defs>
         <linearGradient id="neonPurple" x1="0%" y1="0%" x2="100%" y2="0%">
