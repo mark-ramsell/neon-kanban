@@ -40,7 +40,13 @@ function labelAndIcon(diff: Diff) {
 export default function DiffCard({ diff, expanded, onToggle }: Props) {
   const { config } = useConfig();
   const { selectedAttempt } = useContext(TaskSelectedAttemptContext);
-  const theme = config?.theme === ThemeMode.DARK ? 'dark' : 'light';
+  const theme = config?.theme === ThemeMode.DARK || 
+                config?.theme === ThemeMode.NEON ||
+                config?.theme === ThemeMode.PURPLE ||
+                config?.theme === ThemeMode.GREEN ||
+                config?.theme === ThemeMode.BLUE ||
+                config?.theme === ThemeMode.ORANGE ||
+                config?.theme === ThemeMode.RED ? 'dark' : 'light';
 
   const oldName = diff.oldPath || undefined;
   const newName = diff.newPath || oldName || 'unknown';

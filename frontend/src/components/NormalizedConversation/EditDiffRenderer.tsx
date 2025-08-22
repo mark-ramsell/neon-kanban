@@ -68,7 +68,13 @@ function EditDiffRenderer({
   const [expanded, setExpanded] = useExpandable(expansionKey, false);
 
   let theme: 'light' | 'dark' | undefined = 'light';
-  if (config?.theme === ThemeMode.DARK) {
+  if (config?.theme === ThemeMode.DARK || 
+      config?.theme === ThemeMode.NEON ||
+      config?.theme === ThemeMode.PURPLE ||
+      config?.theme === ThemeMode.GREEN ||
+      config?.theme === ThemeMode.BLUE ||
+      config?.theme === ThemeMode.ORANGE ||
+      config?.theme === ThemeMode.RED) {
     theme = 'dark';
   }
 
