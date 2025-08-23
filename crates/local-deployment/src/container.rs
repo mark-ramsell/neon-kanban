@@ -769,7 +769,7 @@ impl ContainerService for LocalContainerService {
     }
 
     async fn delete_inner(&self, task_attempt: &TaskAttempt) -> Result<(), ContainerError> {
-        // cleanup the container, here that means deleting the worktree
+        // cleanup the container, here that means deleting the worktree and git branch
         let task = task_attempt
             .parent_task(&self.db.pool)
             .await?
@@ -782,6 +782,44 @@ impl ContainerService for LocalContainerService {
                 None
             }
         };
+
+        // Delete the git branch if we have branch name and git repo path
+        if let (Some(branch_name), Some(ref repo_path)) = 
+            (task_attempt.branch.as_ref(), git_repo_path.as_ref())
+        {
+            // Try to get GitHub token from config (for remote branch deletion)
+            let config_guard = self.config.read().await;
+            let github_token = config_guard.github.oauth_token.clone()
+                .or_else(|| config_guard.github.pat.clone());
+            
+            if let Err(e) = self.git.delete_branch(
+                &PathBuf::from(repo_path),
+                branch_name,
+                github_token.as_deref(),
+            ) {
+                tracing::warn!(
+                    "Failed to delete git branch '{}' for task attempt {}: {}",
+                    branch_name,
+                    task_attempt.id,
+                    e
+                );
+            } else {
+                tracing::info!(
+                    "Successfully deleted git branch '{}' for task attempt {}",
+                    branch_name,
+                    task_attempt.id
+                );
+            }
+        } else {
+            tracing::debug!(
+                "Skipping branch deletion for task attempt {} (branch: {:?}, repo_path: {:?})",
+                task_attempt.id,
+                task_attempt.branch,
+                git_repo_path.as_ref().map(|p| p.to_string_lossy())
+            );
+        }
+
+        // Clean up the worktree
         WorktreeManager::cleanup_worktree(
             &PathBuf::from(task_attempt.container_ref.clone().unwrap_or_default()),
             git_repo_path.as_deref(),

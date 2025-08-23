@@ -1391,6 +1391,121 @@ impl GitService {
 
         Ok(stats)
     }
+
+    /// Delete a local git branch
+    pub fn delete_local_branch(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+    ) -> Result<(), GitServiceError> {
+        let repo = self.open_repo(repo_path)?;
+
+        // Find the branch to delete
+        let mut branch = repo
+            .find_branch(branch_name, BranchType::Local)
+            .map_err(|_| GitServiceError::BranchNotFound(branch_name.to_string()))?;
+
+        // Check if this is the current branch
+        if let Ok(head) = repo.head() {
+            if let Some(current_branch_name) = head.shorthand() {
+                if current_branch_name == branch_name {
+                    return Err(GitServiceError::InvalidRepository(format!(
+                        "Cannot delete the current branch: {branch_name}"
+                    )));
+                }
+            }
+        }
+
+        // Delete the branch
+        branch.delete().map_err(GitServiceError::Git)?;
+
+        tracing::info!("Deleted local branch: {}", branch_name);
+        Ok(())
+    }
+
+    /// Delete a remote branch (push deletion to remote)
+    pub fn delete_remote_branch(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+        github_token: &str,
+    ) -> Result<(), GitServiceError> {
+        let repo = self.open_repo(repo_path)?;
+
+        // Get the remote
+        let remote = repo.find_remote("origin")?;
+        let remote_url = remote.url().ok_or_else(|| {
+            GitServiceError::InvalidRepository("Remote origin has no URL".to_string())
+        })?;
+        let https_url = self.convert_to_https_url(remote_url);
+
+        // Create a temporary remote with HTTPS URL for pushing
+        let temp_remote_name = "temp_https_origin";
+
+        // Remove any existing temp remote
+        let _ = repo.remote_delete(temp_remote_name);
+
+        // Create temporary HTTPS remote
+        let mut temp_remote = repo.remote(temp_remote_name, &https_url)?;
+
+        // Create refspec for deleting the remote branch (push empty to delete)
+        let refspec = format!(":refs/heads/{branch_name}");
+
+        // Set up authentication callback using the GitHub token
+        let mut callbacks = git2::RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            git2::Cred::userpass_plaintext(username_from_url.unwrap_or("git"), github_token)
+        });
+
+        // Configure push options
+        let mut push_options = git2::PushOptions::new();
+        push_options.remote_callbacks(callbacks);
+
+        // Push the deletion (empty refspec deletes the remote branch)
+        let push_result = temp_remote.push(&[&refspec], Some(&mut push_options));
+
+        // Clean up the temporary remote
+        let _ = repo.remote_delete(temp_remote_name);
+
+        // Check push result - ignore errors for non-existent branches
+        match push_result {
+            Ok(()) => {
+                tracing::info!("Deleted remote branch: {}", branch_name);
+                Ok(())
+            }
+            Err(e) => {
+                // Log but don't fail for remote branch deletion errors
+                // (branch might not exist on remote, or we might not have permissions)
+                tracing::warn!("Failed to delete remote branch {}: {}", branch_name, e);
+                Ok(())
+            }
+        }
+    }
+
+    /// Delete both local and remote branches
+    pub fn delete_branch(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+        github_token: Option<&str>,
+    ) -> Result<(), GitServiceError> {
+        // Delete local branch first
+        if let Err(e) = self.delete_local_branch(repo_path, branch_name) {
+            match e {
+                GitServiceError::BranchNotFound(_) => {
+                    tracing::debug!("Local branch {} not found, skipping deletion", branch_name);
+                }
+                _ => return Err(e),
+            }
+        }
+
+        // Delete remote branch if token is provided
+        if let Some(token) = github_token {
+            self.delete_remote_branch(repo_path, branch_name, token)?;
+        }
+
+        Ok(())
+    }
 }
 
 // #[cfg(test)]
