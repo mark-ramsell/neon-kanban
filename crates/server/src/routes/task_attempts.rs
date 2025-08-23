@@ -195,10 +195,39 @@ pub async fn follow_up(
         ))),
     }?;
 
-    let profile_variant_label = ProfileVariantLabel {
-        profile: initial_profile_variant_label.profile,
-        variant: payload.variant,
+    let mut profile_variant_label = ProfileVariantLabel {
+        profile: initial_profile_variant_label.profile.clone(),
+        variant: payload.variant.clone(),
     };
+
+    // Pin follow-up to the original profile's agent. If the requested variant would
+    // switch the underlying agent (e.g., Claude -> Gemini), override it to the
+    // initial variant (or default) to keep the same agent family.
+    if let Some(profile_cfg) =
+        ProfileConfigs::get_cached().get_profile(&initial_profile_variant_label.profile)
+    {
+        let initial_agent = initial_profile_variant_label
+            .variant
+            .as_ref()
+            .and_then(|v| profile_cfg.get_variant(v))
+            .map(|v| v.agent.clone())
+            .unwrap_or(profile_cfg.default.agent.clone());
+
+        let candidate_agent = profile_variant_label
+            .variant
+            .as_ref()
+            .and_then(|v| profile_cfg.get_variant(v))
+            .map(|v| v.agent.clone())
+            .unwrap_or(profile_cfg.default.agent.clone());
+
+        if std::mem::discriminant(&candidate_agent) != std::mem::discriminant(&initial_agent) {
+            tracing::warn!(
+                "Follow-up variant switched agent; pinning to original agent by using initial variant {:?}",
+                initial_profile_variant_label.variant
+            );
+            profile_variant_label.variant = initial_profile_variant_label.variant.clone();
+        }
+    }
 
     // Get parent task
     let task = task_attempt
