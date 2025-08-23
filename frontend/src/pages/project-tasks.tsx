@@ -243,17 +243,35 @@ export function ProjectTasks() {
   );
 
   const handleDeleteTask = useCallback(
-    async (taskId: string) => {
+    async (taskIdToDelete: string) => {
       if (!confirm('Are you sure you want to delete this task?')) return;
 
       try {
-        await tasksApi.delete(taskId);
+        // If the currently open task is being deleted, immediately close the panel and
+        // navigate back to the project tasks list to avoid showing stale data.
+        if (taskId && taskId === taskIdToDelete) {
+          // Close UI state locally
+          setIsPanelOpen(false);
+          setSelectedTask(null);
+          // Navigate off the task-specific route to prevent stuck spinner states
+          navigate(`/projects/${projectId}/tasks`, { replace: true });
+        }
+
+        await tasksApi.delete(taskIdToDelete);
         await fetchTasks();
+
+        // If this was the last task, ensure we are on the tasks list route
+        // to avoid an indefinite loader when URL still points at a deleted task.
+        // Note: fetchTasks will refresh tasks; we can check current in-memory length.
+        // If tasks array length was 1 and we deleted that, redirect to /tasks.
+        if (tasks.length === 1) {
+          navigate(`/projects/${projectId}/tasks`, { replace: true });
+        }
       } catch (error) {
         setError('Failed to delete task');
       }
     },
-    [fetchTasks]
+    [taskId, tasks.length, projectId, navigate, fetchTasks]
   );
 
   const handleEditTask = useCallback((task: Task) => {
@@ -353,29 +371,31 @@ export function ProjectTasks() {
     }
   }, [projectId]);
 
-  // Handle direct navigation to task URLs
+  // Handle direct navigation to task URLs and ensure redirect when missing
   useEffect(() => {
-    if (taskId && tasks.length > 0) {
-      const task = tasks.find((t) => t.id === taskId);
-      if (task) {
-        setSelectedTask((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(task)) return prev;
-          return task;
-        });
-        setIsPanelOpen(true);
-      } else {
-        // Task not found in current array - refetch to get latest data
-        fetchTasks(true);
+    if (taskId) {
+      if (tasks.length > 0) {
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) {
+          setSelectedTask((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(task)) return prev;
+            return task;
+          });
+          setIsPanelOpen(true);
+        } else {
+          // Task ID in URL does not exist in current data – navigate back to tasks view
+          navigate(`/projects/${projectId}/tasks`, { replace: true });
+        }
+      } else if (!loading) {
+        // No tasks at all – ensure URL is reset to /tasks to avoid indefinite loading states
+        navigate(`/projects/${projectId}/tasks`, { replace: true });
       }
-    } else if (taskId && tasks.length === 0 && !loading) {
-      // If we have a taskId but no tasks loaded, fetch tasks
-      fetchTasks();
-    } else if (!taskId) {
+    } else {
       // Close panel when no taskId in URL
       setIsPanelOpen(false);
       setSelectedTask(null);
     }
-  }, [taskId, tasks, loading, fetchTasks]);
+  }, [taskId, tasks, loading, projectId, navigate, fetchTasks]);
 
   if (loading) {
     return <Loader message="Loading tasks..." size={32} className="py-8" />;

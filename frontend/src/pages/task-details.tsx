@@ -27,9 +27,16 @@ export function TaskDetailsPage() {
     navigate(`/projects/${projectId}/tasks/${task.id}`);
   };
 
-  const handleDeleteTask = () => {
-    // Navigate back to main task page after deletion
-    // navigate(`/projects/${projectId}/tasks`);
+  const handleDeleteTask = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    // Close the conversation view immediately to avoid stale UI while cleanup runs
+    navigate(`/projects/${projectId}/tasks`, { replace: true });
+    try {
+      await tasksApi.delete(id);
+    } catch (err) {
+      // Surface a simple error without blocking navigation
+      console.error('Failed to delete task from full view:', err);
+    }
   };
 
   useEffect(() => {
