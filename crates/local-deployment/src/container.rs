@@ -783,7 +783,21 @@ impl ContainerService for LocalContainerService {
             }
         };
 
-        // Delete the git branch if we have branch name and git repo path
+        // Clean up the worktree FIRST to avoid issues with deleting the current branch
+        WorktreeManager::cleanup_worktree(
+            &PathBuf::from(task_attempt.container_ref.clone().unwrap_or_default()),
+            git_repo_path.as_deref(),
+        )
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(
+                "Failed to clean up worktree for task attempt {}: {}",
+                task_attempt.id,
+                e
+            );
+        });
+
+        // Delete the git branch AFTER worktree cleanup to avoid current HEAD issues
         if let (Some(branch_name), Some(ref repo_path)) = 
             (task_attempt.branch.as_ref(), git_repo_path.as_ref())
         {
@@ -819,19 +833,6 @@ impl ContainerService for LocalContainerService {
             );
         }
 
-        // Clean up the worktree
-        WorktreeManager::cleanup_worktree(
-            &PathBuf::from(task_attempt.container_ref.clone().unwrap_or_default()),
-            git_repo_path.as_deref(),
-        )
-        .await
-        .unwrap_or_else(|e| {
-            tracing::warn!(
-                "Failed to clean up worktree for task attempt {}: {}",
-                task_attempt.id,
-                e
-            );
-        });
         Ok(())
     }
 
