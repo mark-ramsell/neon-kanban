@@ -1,6 +1,7 @@
 use std::{
     collections::VecDeque,
     sync::{Arc, RwLock},
+    time::Instant,
 };
 
 use axum::response::sse::Event;
@@ -13,15 +14,26 @@ use crate::{log_msg::LogMsg, stream_lines::LinesStreamExt};
 // 100 MB Limit
 const HISTORY_BYTES: usize = 100000 * 1024;
 
+#[derive(Debug)]
+pub struct MemoryMetrics {
+    pub total_messages: usize,
+    pub total_bytes: usize,
+    pub oldest_message_age_secs: u64,
+    pub broadcast_receivers: usize,
+    pub history_capacity: usize,
+}
+
 #[derive(Clone)]
 struct StoredMsg {
     msg: LogMsg,
     bytes: usize,
+    timestamp: Instant,
 }
 
 struct Inner {
     history: VecDeque<StoredMsg>,
     total_bytes: usize,
+    created_at: Instant,
 }
 
 pub struct MsgStore {
@@ -42,6 +54,7 @@ impl MsgStore {
             inner: RwLock::new(Inner {
                 history: VecDeque::with_capacity(32),
                 total_bytes: 0,
+                created_at: Instant::now(),
             }),
             sender,
         }
@@ -59,7 +72,11 @@ impl MsgStore {
                 break;
             }
         }
-        inner.history.push_back(StoredMsg { msg, bytes });
+        inner.history.push_back(StoredMsg {
+            msg,
+            bytes,
+            timestamp: Instant::now(),
+        });
         inner.total_bytes = inner.total_bytes.saturating_add(bytes);
     }
 
@@ -93,6 +110,48 @@ impl MsgStore {
             .iter()
             .map(|s| s.msg.clone())
             .collect()
+    }
+
+    /// Get memory usage statistics
+    pub fn get_memory_metrics(&self) -> MemoryMetrics {
+        let inner = self.inner.read().unwrap();
+        let now = Instant::now();
+
+        let oldest_message_age_secs = inner
+            .history
+            .front()
+            .map(|msg| now.duration_since(msg.timestamp).as_secs())
+            .unwrap_or(0);
+
+        MemoryMetrics {
+            total_messages: inner.history.len(),
+            total_bytes: inner.total_bytes,
+            oldest_message_age_secs,
+            broadcast_receivers: self.sender.receiver_count(),
+            history_capacity: inner.history.capacity(),
+        }
+    }
+
+    /// Force cleanup of old messages beyond age limit
+    pub fn cleanup_old_messages(&self, max_age_secs: u64) {
+        let mut inner = self.inner.write().unwrap();
+        let now = Instant::now();
+        let mut cleaned_count = 0;
+
+        while let Some(front) = inner.history.front() {
+            if now.duration_since(front.timestamp).as_secs() > max_age_secs {
+                if let Some(old_msg) = inner.history.pop_front() {
+                    inner.total_bytes = inner.total_bytes.saturating_sub(old_msg.bytes);
+                    cleaned_count += 1;
+                }
+            } else {
+                break;
+            }
+        }
+
+        if cleaned_count > 0 {
+            tracing::debug!("Cleaned up {} old messages", cleaned_count);
+        }
     }
 
     /// History then live, as `LogMsg`.
@@ -171,5 +230,18 @@ impl MsgStore {
                 }
             }
         })
+    }
+
+    /// Log current memory statistics
+    pub fn log_memory_stats(&self) {
+        let metrics = self.get_memory_metrics();
+        tracing::info!(
+            "MsgStore metrics - Messages: {}, Bytes: {}, Oldest: {}s, Receivers: {}, Capacity: {}",
+            metrics.total_messages,
+            metrics.total_bytes,
+            metrics.oldest_message_age_secs,
+            metrics.broadcast_receivers,
+            metrics.history_capacity
+        );
     }
 }

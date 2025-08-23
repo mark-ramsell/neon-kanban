@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Stdio, sync::Arc, fs};
+use std::{fs, path::PathBuf, process::Stdio, sync::Arc};
 
 use async_trait::async_trait;
 use command_group::{AsyncCommandGroup, AsyncGroupChild};
@@ -77,7 +77,7 @@ impl StandardCodingAgentExecutor for ClaudeCode {
         session_id: &str,
     ) -> Result<AsyncGroupChild, ExecutorError> {
         let (shell_cmd, shell_arg) = get_shell_command();
-        
+
         // Determine what to resume with - provided session ID (if valid) or fallback to most recent
         let effective_session_id = if session_id.is_empty() {
             // No session ID provided, try to find most recent session ID from conversation files
@@ -113,14 +113,14 @@ impl StandardCodingAgentExecutor for ClaudeCode {
                 "".to_string()
             }
         };
-        
+
         // Build resume arguments - either with session ID or empty for fresh start
         let resume_args = if effective_session_id.is_empty() {
             vec![]
         } else {
             vec!["--resume".to_string(), effective_session_id]
         };
-        
+
         // Build follow-up command with appropriate resume arguments
         let claude_command = if self.plan {
             let base_command = self.command.build_follow_up(&resume_args);
@@ -199,10 +199,7 @@ impl ClaudeCode {
                         if let Ok(jsonl_entries) = fs::read_dir(&path) {
                             for jsonl_entry in jsonl_entries.flatten() {
                                 let jsonl_path = jsonl_entry.path();
-                                if jsonl_path
-                                    .extension()
-                                    .and_then(|s| s.to_str())
-                                    == Some("jsonl")
+                                if jsonl_path.extension().and_then(|s| s.to_str()) == Some("jsonl")
                                 {
                                     candidate_files.push(jsonl_path);
                                 }
@@ -248,9 +245,7 @@ impl ClaudeCode {
         if let Ok(content) = fs::read_to_string(file_path) {
             for line in content.lines() {
                 if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
-                    if json_value
-                        .get("sessionId")
-                        .and_then(|v| v.as_str())
+                    if json_value.get("sessionId").and_then(|v| v.as_str())
                         == Some(target_session_id)
                     {
                         return true;
@@ -290,10 +285,17 @@ impl ClaudeCode {
             // Try to find the most recent session ID from conversation files as fallback
             if let Some(fallback_session_id) = self.find_most_recent_session_id(current_dir) {
                 if fallback_session_id != session_id {
-                    tracing::info!("Original session ID failed, trying fallback session ID from most recent conversation: {}", fallback_session_id);
-                    return self.spawn_follow_up(current_dir, prompt, &fallback_session_id).await;
+                    tracing::info!(
+                        "Original session ID failed, trying fallback session ID from most recent conversation: {}",
+                        fallback_session_id
+                    );
+                    return self
+                        .spawn_follow_up(current_dir, prompt, &fallback_session_id)
+                        .await;
                 } else {
-                    tracing::warn!("Fallback session ID is the same as the failed one, starting fresh conversation");
+                    tracing::warn!(
+                        "Fallback session ID is the same as the failed one, starting fresh conversation"
+                    );
                     return self.spawn_follow_up(current_dir, prompt, "").await;
                 }
             } else {
@@ -301,7 +303,7 @@ impl ClaudeCode {
                 return self.spawn_follow_up(current_dir, prompt, "").await;
             }
         }
-        
+
         // Normal flow - either initial attempt or already using fallback
         self.spawn_follow_up(current_dir, prompt, session_id).await
     }
@@ -309,9 +311,12 @@ impl ClaudeCode {
     fn find_most_recent_session_id(&self, current_dir: &PathBuf) -> Option<String> {
         let home_dir = dirs::home_dir()?;
         let claude_projects_dir = home_dir.join(".claude").join("projects");
-        
+
         if !claude_projects_dir.exists() {
-            tracing::warn!("Claude projects directory not found at {:?}", claude_projects_dir);
+            tracing::warn!(
+                "Claude projects directory not found at {:?}",
+                claude_projects_dir
+            );
             return None;
         }
 
@@ -369,17 +374,23 @@ impl ClaudeCode {
 
         // Sort by modification time (most recent first) and extract session ID from the most recent file
         matching_files.sort_by(|a, b| b.1.cmp(&a.1));
-        
+
         if let Some((most_recent_file, _)) = matching_files.first() {
-            tracing::info!("Found most recent conversation file: {:?}", most_recent_file);
-            
+            tracing::info!(
+                "Found most recent conversation file: {:?}",
+                most_recent_file
+            );
+
             // Extract session ID from the JSONL file
             if let Some(session_id) = self.extract_session_id_from_jsonl(most_recent_file) {
-                tracing::info!("Extracted session ID from conversation file: {}", session_id);
+                tracing::info!(
+                    "Extracted session ID from conversation file: {}",
+                    session_id
+                );
                 return Some(session_id);
             }
         }
-        
+
         None
     }
 
@@ -390,15 +401,16 @@ impl ClaudeCode {
                 // Read the first line that contains a session ID
                 for line in content.lines() {
                     if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line) {
-                        if let Some(session_id) = json_value.get("sessionId")
-                            .and_then(|v| v.as_str()) {
+                        if let Some(session_id) =
+                            json_value.get("sessionId").and_then(|v| v.as_str())
+                        {
                             return Some(session_id.to_string());
                         }
                     }
                 }
                 tracing::warn!("No session ID found in conversation file: {:?}", file_path);
                 None
-            },
+            }
             Err(e) => {
                 tracing::error!("Failed to read conversation file {:?}: {}", file_path, e);
                 None
@@ -1298,11 +1310,11 @@ mod tests {
         // This test verifies that the fallback logic is triggered when session_id is empty
         // The actual file lookup will depend on the environment, so we just test the logic path
         let current_dir = PathBuf::from("/tmp/test-worktree");
-        
+
         // Test with empty session ID - should trigger fallback logic
         // Note: This test mainly verifies the code doesn't panic and follows the correct path
         let result = executor.find_most_recent_session_id(&current_dir);
-        
+
         // In most test environments, this will return None since Claude projects may not exist
         // But the function should handle this gracefully
         assert!(result.is_none() || result.is_some());
