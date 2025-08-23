@@ -798,14 +798,17 @@ impl ContainerService for LocalContainerService {
         });
 
         // Delete the git branch AFTER worktree cleanup to avoid current HEAD issues
-        if let (Some(branch_name), Some(ref repo_path)) = 
+        if let (Some(branch_name), Some(ref repo_path)) =
             (task_attempt.branch.as_ref(), git_repo_path.as_ref())
         {
             // Try to get GitHub token from config (for remote branch deletion)
             let config_guard = self.config.read().await;
-            let github_token = config_guard.github.oauth_token.clone()
+            let github_token = config_guard
+                .github
+                .oauth_token
+                .clone()
                 .or_else(|| config_guard.github.pat.clone());
-            
+
             if let Err(e) = self.git.delete_branch(
                 &PathBuf::from(repo_path),
                 branch_name,

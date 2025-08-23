@@ -1405,13 +1405,38 @@ impl GitService {
             .find_branch(branch_name, BranchType::Local)
             .map_err(|_| GitServiceError::BranchNotFound(branch_name.to_string()))?;
 
-        // Check if this is the current branch
+        // Check if this is the current branch in the main repository
         if let Ok(head) = repo.head() {
             if let Some(current_branch_name) = head.shorthand() {
                 if current_branch_name == branch_name {
                     return Err(GitServiceError::InvalidRepository(format!(
                         "Cannot delete the current branch: {branch_name}"
                     )));
+                }
+            }
+        }
+
+        // Critical fix: Check if any worktrees are still using this branch
+        if let Ok(worktrees) = repo.worktrees() {
+            for worktree_name in worktrees.iter().flatten() {
+                if let Ok(worktree) = repo.find_worktree(worktree_name) {
+                    if let Ok(worktree_repo) = Repository::open_from_worktree(&worktree) {
+                        if let Ok(head) = worktree_repo.head() {
+                            if let Some(current_branch_name) = head.shorthand() {
+                                if current_branch_name == branch_name {
+                                    tracing::warn!(
+                                        "Skipping deletion of branch '{}' - still in use by worktree '{}'",
+                                        branch_name,
+                                        worktree_name
+                                    );
+                                    return Err(GitServiceError::InvalidRepository(format!(
+                                        "Cannot delete branch '{}' - still in use by worktree '{}'",
+                                        branch_name, worktree_name
+                                    )));
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
