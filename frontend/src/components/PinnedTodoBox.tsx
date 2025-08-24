@@ -29,7 +29,7 @@ const getStatusIcon = (status: string): React.ReactNode => {
 };
 
 export const PinnedTodoBox: React.FC<PinnedTodoBoxProps> = ({ todos }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   if (todos.length === 0) return null;
 
