@@ -142,11 +142,8 @@ export function TaskFollowUpSection() {
       setImages([]);
       setNewlyUploadedImageIds([]);
       setShowImageUpload(false);
-      // Delay fetching attempt data to prevent jittering by allowing the follow-up process
-      // to start and establish SSE connections before refetching processes
-      setTimeout(() => {
-        fetchAttemptData(selectedAttempt.id);
-      }, 2500);
+      // Note: We don't immediately fetch attempt data to avoid disrupting existing SSE connections.
+      // The periodic refresh in TaskDetailsContextProvider will pick up changes every 5 seconds.
     } catch (error: unknown) {
       // @ts-expect-error it is type ApiError
       setFollowUpError(`Failed to start follow-up execution: ${error.message}`);

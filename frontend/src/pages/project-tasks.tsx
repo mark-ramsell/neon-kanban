@@ -180,11 +180,12 @@ export function ProjectTasks() {
           parent_task_attempt: null,
           image_ids: imageIds || null,
         });
-        await fetchTasks();
-        // Open the newly created task in the details panel
+        // Navigate to the newly created task immediately to avoid jittering
         navigate(`/projects/${projectId}/tasks/${createdTask.id}`, {
           replace: true,
         });
+        // Refresh the task list without showing loading state to avoid UI jitter
+        await fetchTasks(true); // skipLoading = true
       } catch (err) {
         setError('Failed to create task');
       }
@@ -204,9 +205,10 @@ export function ProjectTasks() {
           image_ids: imageIds || null,
         };
         const result = await tasksApi.createAndStart(payload);
-        await fetchTasks();
-        // Open the newly created task in the details panel
+        // Navigate to the task details immediately to avoid jittering
         handleViewTaskDetails(result);
+        // Refresh the task list without showing loading state to avoid UI jitter
+        await fetchTasks(true); // skipLoading = true
       } catch (err) {
         setError('Failed to create and start task');
       }
