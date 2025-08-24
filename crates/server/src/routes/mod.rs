@@ -15,6 +15,7 @@ pub mod execution_processes;
 pub mod frontend;
 pub mod health;
 pub mod images;
+pub mod jira;
 pub mod projects;
 pub mod task_attempts;
 pub mod task_templates;
@@ -34,6 +35,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(auth::router(&deployment))
         .merge(filesystem::router())
         .merge(events::router(&deployment))
+        .merge(jira::router(&deployment))
         .nest("/images", images::routes())
         .with_state(deployment);
 

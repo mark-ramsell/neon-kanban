@@ -2,6 +2,7 @@ pub mod execution_process;
 pub mod execution_process_logs;
 pub mod executor_session;
 pub mod image;
+pub mod jira_integration;
 pub mod merge;
 pub mod project;
 pub mod task;

@@ -658,3 +658,62 @@ export const imagesApi = {
     return `/api/images/${imageId}/file`;
   },
 };
+
+// Jira API
+export const jiraApi = {
+  startOAuth: async (): Promise<{ authorization_url: string; state: string }> => {
+    const response = await makeRequest('/api/jira/oauth/start', {
+      method: 'POST',
+    });
+    return handleApiResponse<{ authorization_url: string; state: string }>(response);
+  },
+
+  refreshToken: async (cloudid: string): Promise<{ access_token: string; refresh_token: string; expires_in: number; scope: string; token_type: string }> => {
+    const response = await makeRequest('/api/jira/oauth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ cloudid }),
+    });
+    return handleApiResponse<{ access_token: string; refresh_token: string; expires_in: number; scope: string; token_type: string }>(response);
+  },
+
+  getAccessibleSites: async (): Promise<Array<{ id: string; name: string; url: string; scopes: string[]; avatar_url: string }>> => {
+    const response = await makeRequest('/api/jira/sites/accessible');
+    return handleApiResponse<Array<{ id: string; name: string; url: string; scopes: string[]; avatar_url: string }>>(response);
+  },
+
+  getProjects: async (cloudid: string): Promise<Array<{ id: string; key: string; name: string; project_type_key: string; description?: string }>> => {
+    const response = await makeRequest(`/api/jira/projects/${cloudid}`);
+    return handleApiResponse<Array<{ id: string; key: string; name: string; project_type_key: string; description?: string }>>(response);
+  },
+
+  testConnection: async (cloudid: string): Promise<{ connected: boolean; site_name: string; user?: any; accessible_projects: number; granted_scopes: string[] }> => {
+    const response = await makeRequest(`/api/jira/connection/test/${cloudid}`, {
+      method: 'POST',
+    });
+    return handleApiResponse<{ connected: boolean; site_name: string; user?: any; accessible_projects: number; granted_scopes: string[] }>(response);
+  },
+
+  getConfigs: async (): Promise<Array<{ id: string; cloudid: string; site_name: string; site_url: string; is_active: boolean }>> => {
+    const response = await makeRequest('/api/jira/configs');
+    return handleApiResponse<Array<{ id: string; cloudid: string; site_name: string; site_url: string; is_active: boolean }>>(response);
+  },
+
+  getConfig: async (cloudid: string): Promise<{ id: string; cloudid: string; site_name: string; site_url: string; is_active: boolean }> => {
+    const response = await makeRequest(`/api/jira/configs/${cloudid}`);
+    return handleApiResponse<{ id: string; cloudid: string; site_name: string; site_url: string; is_active: boolean }>(response);
+  },
+
+  deleteConfig: async (cloudid: string): Promise<string> => {
+    const response = await makeRequest(`/api/jira/configs/${cloudid}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<string>(response);
+  },
+
+  revokeAccess: async (cloudid: string): Promise<string> => {
+    const response = await makeRequest(`/api/jira/revoke/${cloudid}`, {
+      method: 'POST',
+    });
+    return handleApiResponse<string>(response);
+  },
+};

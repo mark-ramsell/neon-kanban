@@ -38,6 +38,7 @@ import { useTheme } from '@/components/theme-provider';
 import { useUserSystem } from '@/components/config-provider';
 import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
 import { TaskTemplateManager } from '@/components/TaskTemplateManager';
+import { JiraIntegrationCard } from '@/components/jira/JiraIntegrationCard';
 import { profilesApi } from '@/lib/api';
 
 export function Settings() {
@@ -536,6 +537,8 @@ export function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          <JiraIntegrationCard />
 
           <Card>
             <CardHeader>
