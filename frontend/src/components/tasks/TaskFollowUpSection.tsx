@@ -165,6 +165,14 @@ export function TaskFollowUpSection() {
               <AlertDescription>{followUpError}</AlertDescription>
             </Alert>
           )}
+          {isAttemptRunning && !isSendingFollowUp && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border">
+              <Loader size={16} />
+              <span className="text-sm text-muted-foreground">
+                AI is working on your request...
+              </span>
+            </div>
+          )}
           <div className="space-y-2">
             {showImageUpload && (
               <div className="mb-2">
