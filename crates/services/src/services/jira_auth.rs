@@ -50,7 +50,7 @@ pub struct JiraOAuthStartResponse {
 #[derive(Debug, Serialize, Deserialize, TS)]
 pub struct JiraTokenResponse {
     pub access_token: String,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     pub expires_in: u32,          // 3600 seconds (1 hour)
     pub scope: String,
     pub token_type: String,       // "Bearer"
@@ -171,7 +171,7 @@ impl JiraAuthService {
         auth_url.query_pairs_mut()
             .append_pair("audience", "api.atlassian.com")  // CRITICAL: Required for API access
             .append_pair("client_id", &self.client_id)
-            .append_pair("scope", "read:jira-work write:jira-work read:jira-user offline_access")
+            .append_pair("scope", "read:jira-work write:jira-work read:jira-user")
             .append_pair("redirect_uri", &self.redirect_uri)
             .append_pair("state", state)
             .append_pair("response_type", "code")
@@ -193,7 +193,6 @@ impl JiraAuthService {
         params.insert("client_secret", self.client_secret.expose_secret());
         params.insert("code", code);
         params.insert("redirect_uri", &self.redirect_uri);
-        params.insert("state", state);
 
         let response = self
             .client
@@ -203,21 +202,29 @@ impl JiraAuthService {
             .send()
             .await?;
 
-        if response.status().is_success() {
+        let status = response.status();
+        if status.is_success() {
+            // Avoid logging token body; just parse
             let token_response: JiraTokenResponse = response.json().await?;
             Ok(token_response)
         } else {
-            let error_response: TokenErrorResponse = response.json().await
-                .unwrap_or_else(|_| TokenErrorResponse {
-                    error: "unknown_error".to_string(),
-                    error_description: Some("Failed to parse error response".to_string()),
-                });
-            
-            Err(JiraAuthError::OAuth(format!(
-                "{}: {}",
-                error_response.error,
-                error_response.error_description.unwrap_or_default()
-            )))
+            // Try to capture response text for diagnostics
+            let text = response.text().await.unwrap_or_default();
+            // Try parse structured error if possible
+            let parsed: Result<TokenErrorResponse, _> = serde_json::from_str(&text);
+            if let Ok(err) = parsed {
+                Err(JiraAuthError::OAuth(format!(
+                    "{}: {}",
+                    err.error,
+                    err.error_description.unwrap_or_default()
+                )))
+            } else {
+                Err(JiraAuthError::OAuth(format!(
+                    "HTTP {}: {}",
+                    status.as_u16(),
+                    text
+                )))
+            }
         }
     }
 

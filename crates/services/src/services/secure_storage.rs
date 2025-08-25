@@ -186,6 +186,17 @@ impl JiraCredentialManager {
         
         self.storage.store_credential(&access_key, access_token).await?;
         self.storage.store_credential(&refresh_key, refresh_token).await?;
+
+        // Update sites index
+        let mut sites = self.list_sites().await.unwrap_or_default();
+        if !sites.iter().any(|s| s == cloudid) {
+            sites.push(cloudid.to_string());
+            let sites_raw = serde_json::to_string(&sites)
+                .map_err(|e| SecureStorageError::InvalidData(e.to_string()))?;
+            self.storage
+                .store_credential("sites.index", &sites_raw)
+                .await?;
+        }
         Ok(())
     }
     
@@ -210,6 +221,18 @@ impl JiraCredentialManager {
         
         self.storage.delete_credential(&access_key).await?;
         self.storage.delete_credential(&refresh_key).await?;
+
+        // Remove from sites index
+        let mut sites = self.list_sites().await.unwrap_or_default();
+        let before_len = sites.len();
+        sites.retain(|s| s != cloudid);
+        if sites.len() != before_len {
+            let sites_raw = serde_json::to_string(&sites)
+                .map_err(|e| SecureStorageError::InvalidData(e.to_string()))?;
+            self.storage
+                .store_credential("sites.index", &sites_raw)
+                .await?;
+        }
         Ok(())
     }
     
@@ -218,6 +241,38 @@ impl JiraCredentialManager {
         self.storage.delete_credential("oauth.client_id").await?;
         self.storage.delete_credential("oauth.client_secret").await?;
         Ok(())
+    }
+
+    /// Store global OAuth tokens (used to fetch accessible resources)
+    pub async fn store_oauth_tokens(&self, access_token: &str, refresh_token: &str) -> Result<(), SecureStorageError> {
+        self.storage
+            .store_credential("oauth.access_token", access_token)
+            .await?;
+        self.storage
+            .store_credential("oauth.refresh_token", refresh_token)
+            .await?;
+        Ok(())
+    }
+
+    /// Retrieve global OAuth tokens
+    pub async fn get_oauth_tokens(&self) -> Result<Option<(String, String)>, SecureStorageError> {
+        let access = self.storage.retrieve_credential("oauth.access_token").await?;
+        let refresh = self.storage.retrieve_credential("oauth.refresh_token").await?;
+        match (access, refresh) {
+            (Some(a), Some(r)) => Ok(Some((a, r))),
+            _ => Ok(None),
+        }
+    }
+
+    /// List stored site cloudids
+    pub async fn list_sites(&self) -> Result<Vec<String>, SecureStorageError> {
+        let raw = match self.storage.retrieve_credential("sites.index").await? {
+            Some(s) => s,
+            None => return Ok(vec![]),
+        };
+        let parsed: Vec<String> = serde_json::from_str(&raw)
+            .map_err(|e| SecureStorageError::InvalidData(e.to_string()))?;
+        Ok(parsed)
     }
 }
 

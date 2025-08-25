@@ -661,16 +661,32 @@ export const imagesApi = {
 
 // Jira API
 export const jiraApi = {
-  startOAuth: async (): Promise<{
+  startOAuth: async (
+    redirectUri?: string
+  ): Promise<{
     authorization_url: string;
     state: string;
   }> => {
     const response = await makeRequest('/api/jira/oauth/start', {
       method: 'POST',
+      body: JSON.stringify({ redirect_uri: redirectUri }),
     });
     return handleApiResponse<{ authorization_url: string; state: string }>(
       response
     );
+  },
+
+  oauthCallback: async (
+    code: string,
+    state: string,
+    redirectUri?: string
+  ): Promise<string> => {
+    const params = new URLSearchParams({ code, state });
+    if (redirectUri) params.set('redirect_uri', redirectUri);
+    const response = await makeRequest(
+      `/api/jira/oauth/callback?${params.toString()}`
+    );
+    return handleApiResponse<string>(response);
   },
 
   getCredentialsStatus: async (): Promise<{ configured: boolean }> => {

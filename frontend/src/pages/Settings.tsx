@@ -39,7 +39,7 @@ import { useUserSystem } from '@/components/config-provider';
 import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
 import { TaskTemplateManager } from '@/components/TaskTemplateManager';
 import { JiraIntegrationCard } from '@/components/jira/JiraIntegrationCard';
-import { profilesApi } from '@/lib/api';
+import { profilesApi, jiraApi } from '@/lib/api';
 
 export function Settings() {
   const {
@@ -54,6 +54,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [oauthMessage, setOauthMessage] = useState<string | null>(null);
   const { setTheme } = useTheme();
   const [showGitHubLogin, setShowGitHubLogin] = useState(false);
 
@@ -81,6 +82,26 @@ export function Settings() {
       }
     };
     loadProfiles();
+  }, []);
+
+  // Handle Jira OAuth callback if code/state exist in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    if (!code || !state) return;
+
+    (async () => {
+      try {
+        await jiraApi.oauthCallback(code, state);
+        setOauthMessage('Jira authorization completed.');
+      } catch (err: any) {
+        setOauthMessage(err?.message || 'Failed to complete Jira authorization.');
+      } finally {
+        // Clear query params
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    })();
   }, []);
 
   const playSound = async (soundFile: SoundFile) => {
@@ -225,10 +246,10 @@ export function Settings() {
           </Alert>
         )}
 
-        {success && (
+        {(success || oauthMessage) && (
           <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
             <AlertDescription className="font-medium">
-              ✓ Settings saved successfully!
+              {oauthMessage ? `✓ ${oauthMessage}` : '✓ Settings saved successfully!'}
             </AlertDescription>
           </Alert>
         )}

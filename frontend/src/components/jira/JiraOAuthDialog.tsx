@@ -38,7 +38,7 @@ type OAuthStep = 'start' | 'authorizing' | 'processing' | 'success' | 'error';
 export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDialogProps) {
   const [step, setStep] = useState<OAuthStep>('start');
   const [authUrl, setAuthUrl] = useState<string>('');
-  const [, setState] = useState<string>('');
+  const [oauthState, setState] = useState<string>('');
   const [sites, setSites] = useState<JiraResource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -62,7 +62,7 @@ export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDial
       setStep('authorizing');
       setError(null);
       
-      const response = await jiraApi.startOAuth();
+      const response = await jiraApi.startOAuth(`${window.location.origin}/settings`);
       setAuthUrl(response.authorization_url);
       setState(response.state);
       
@@ -73,8 +73,17 @@ export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDial
       setIsPolling(true);
       const interval = setInterval(async () => {
         try {
-          // Check if we have any new sites (simplified polling)
-          // In a real implementation, you'd want to check the callback or use WebSockets
+          // Try to complete callback if redirected back into this window/tab
+          const params = new URLSearchParams(window.location.search);
+          const code = params.get('code');
+          const state = params.get('state');
+          if (code && state && state === oauthState) {
+            await jiraApi.oauthCallback(code, state, `${window.location.origin}/settings`);
+            // Clear URL params so we don't re-trigger
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+
+          // Then check if we have any configs yet
           const configs = await jiraApi.getConfigs();
           if (configs.length > 0) {
             // For this demo, we'll consider it successful if we have configs
@@ -94,7 +103,7 @@ export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDial
         } catch (err) {
           // Continue polling on error
         }
-      }, 2000);
+      }, 1500);
       
       setPollInterval(interval);
       
