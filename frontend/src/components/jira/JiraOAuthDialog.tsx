@@ -38,11 +38,11 @@ type OAuthStep = 'start' | 'authorizing' | 'processing' | 'success' | 'error';
 export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDialogProps) {
   const [step, setStep] = useState<OAuthStep>('start');
   const [authUrl, setAuthUrl] = useState<string>('');
-  const [state, setState] = useState<string>('');
+  const [, setState] = useState<string>('');
   const [sites, setSites] = useState<JiraResource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   const resetDialog = useCallback(() => {
     setStep('start');

@@ -34,7 +34,6 @@ export function TaskFollowUpSection() {
   const { selectedAttempt } = useContext(TaskSelectedAttemptContext);
   const {
     attemptData,
-    fetchAttemptData,
     isAttemptRunning,
     defaultFollowUpVariant,
     branchStatus,

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 export function Logo({ className = '' }: { className?: string }) {
   const { theme } = useTheme();
-  const [isDark, setIsDark] = useState(false);
+  const [, setIsDark] = useState(false);
 
   useEffect(() => {
     const updateTheme = () => {
@@ -28,7 +28,7 @@ export function Logo({ className = '' }: { className?: string }) {
     }
   }, [theme]);
 
-  const fillColor = isDark ? '#ffffff' : '#000000';
+  // const fillColor = isDark ? '#ffffff' : '#000000';
 
   return (
     <svg

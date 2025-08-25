@@ -7,6 +7,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -21,14 +23,6 @@ import {
 } from 'lucide-react';
 import { jiraApi } from '@/lib/api';
 import { JiraOAuthDialog } from './JiraOAuthDialog';
-
-interface JiraResource {
-  id: string;
-  name: string;
-  url: string;
-  scopes: string[];
-  avatar_url: string;
-}
 
 interface JiraConfig {
   id: string;
@@ -58,11 +52,22 @@ export function JiraIntegrationCard() {
   const [showOAuthDialog, setShowOAuthDialog] = useState(false);
   const [testingConnections, setTestingConnections] = useState<Set<string>>(new Set());
   const [refreshingTokens, setRefreshingTokens] = useState<Set<string>>(new Set());
+  const [clientId, setClientId] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
+  const [credsConfigured, setCredsConfigured] = useState<boolean | null>(null);
+  const [savingCreds, setSavingCreds] = useState(false);
 
   const loadConfigs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      // Load credential status first
+      try {
+        const status = await jiraApi.getCredentialsStatus();
+        setCredsConfigured(status.configured);
+      } catch (e) {
+        // Non-fatal for the rest of UI
+      }
       const configs = await jiraApi.getConfigs();
       setConnectedSites(configs);
     } catch (err: any) {
@@ -189,6 +194,87 @@ export function JiraIntegrationCard() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <div className="space-y-3 p-3 border rounded-md">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">OAuth Credentials</h4>
+              {credsConfigured === true && (
+                <Badge variant="secondary">Configured</Badge>
+              )}
+              {credsConfigured === false && (
+                <Badge variant="destructive">Not configured</Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="jira-client-id">Client ID</Label>
+                <Input
+                  id="jira-client-id"
+                  type="password"
+                  placeholder="Enter Jira OAuth client ID"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="jira-client-secret">Client Secret</Label>
+                <Input
+                  id="jira-client-secret"
+                  type="password"
+                  placeholder="Enter Jira OAuth client secret"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Redirect URI (add this to your Atlassian App)</Label>
+              <Input
+                readOnly
+                value={`${window.location.origin}/settings`}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={async () => {
+                  setSavingCreds(true);
+                  setError(null);
+                  try {
+                    await jiraApi.setCredentials(clientId, clientSecret);
+                    setClientId('');
+                    setClientSecret('');
+                    setCredsConfigured(true);
+                  } catch (e: any) {
+                    setError(e?.message || 'Failed to save credentials');
+                  } finally {
+                    setSavingCreds(false);
+                  }
+                }}
+                disabled={savingCreds || !clientId || !clientSecret}
+              >
+                {savingCreds ? 'Saving…' : 'Save OAuth Credentials'}
+              </Button>
+              {credsConfigured && (
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setSavingCreds(true);
+                    setError(null);
+                    try {
+                      await jiraApi.deleteCredentials();
+                      setCredsConfigured(false);
+                    } catch (e: any) {
+                      setError(e?.message || 'Failed to clear credentials');
+                    } finally {
+                      setSavingCreds(false);
+                    }
+                  }}
+                >
+                  Clear Credentials
+                </Button>
+              )}
+            </div>
+          </div>
 
           {connectedSites.length === 0 ? (
             <div className="text-center py-8">
