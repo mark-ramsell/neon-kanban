@@ -33,7 +33,7 @@ const TASK_CLEANUP_INTERVAL_SECS: u64 = 300; // 5 minutes
 #[derive(Clone)]
 pub struct EventService {
     msg_store: Arc<MsgStore>,
-    db: DBService,
+    _db: DBService,
     entry_count: Arc<RwLock<usize>>,
     active_tasks: Arc<RwLock<HashMap<String, JoinHandle<()>>>>,
     last_cleanup: Arc<RwLock<Instant>>,
@@ -78,7 +78,7 @@ impl EventService {
     pub fn new(db: DBService, msg_store: Arc<MsgStore>, entry_count: Arc<RwLock<usize>>) -> Self {
         Self {
             msg_store,
-            db,
+            _db: db,
             entry_count,
             active_tasks: Arc::new(RwLock::new(HashMap::new())),
             last_cleanup: Arc::new(RwLock::new(Instant::now())),
@@ -136,6 +136,7 @@ impl EventService {
     }
 
     /// Check if we need to perform cleanup based on current state
+    #[allow(dead_code)]
     async fn should_cleanup(&self) -> bool {
         let entry_count = *self.entry_count.read().await;
         let active_tasks_count = self.active_tasks.read().await.len();

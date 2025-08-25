@@ -152,6 +152,7 @@ pub fn async_watcher(
     Ok((debouncer, rx, canonical_root))
 }
 
+#[allow(dead_code)]
 async fn async_watch<P: AsRef<Path>>(path: P) -> Result<(), FilesystemWatcherError> {
     let (_debouncer, mut rx, _canonical_path) = async_watcher(path.as_ref().to_path_buf())?;
 

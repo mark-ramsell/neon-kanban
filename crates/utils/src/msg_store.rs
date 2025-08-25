@@ -33,7 +33,7 @@ struct StoredMsg {
 struct Inner {
     history: VecDeque<StoredMsg>,
     total_bytes: usize,
-    created_at: Instant,
+    _created_at: Instant,
 }
 
 pub struct MsgStore {
@@ -54,7 +54,7 @@ impl MsgStore {
             inner: RwLock::new(Inner {
                 history: VecDeque::with_capacity(32),
                 total_bytes: 0,
-                created_at: Instant::now(),
+                _created_at: Instant::now(),
             }),
             sender,
         }

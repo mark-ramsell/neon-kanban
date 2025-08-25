@@ -185,7 +185,7 @@ impl JiraAuthService {
     pub async fn exchange_code_for_tokens(
         &self,
         code: &str,
-        state: &str,
+        _state: &str,
     ) -> Result<JiraTokenResponse, JiraAuthError> {
         let mut params = HashMap::new();
         params.insert("grant_type", "authorization_code");

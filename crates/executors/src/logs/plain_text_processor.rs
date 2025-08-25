@@ -120,6 +120,7 @@ impl PlainTextBuffer {
     }
 
     /// Return the total number of lines.
+    #[allow(dead_code)]
     pub fn line_count(&self) -> usize {
         self.lines.len()
     }

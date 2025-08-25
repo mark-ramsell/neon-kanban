@@ -485,6 +485,7 @@ impl LocalContainerService {
     }
 
     /// Get the worktree path for a task attempt
+    #[allow(dead_code)]
     async fn get_worktree_path(
         &self,
         task_attempt: &TaskAttempt,
@@ -645,7 +646,7 @@ impl LocalContainerService {
     /// Process file changes and generate diff events
     fn process_file_changes(
         git_service: &GitService,
-        project_repo_path: &Path,
+        _project_repo_path: &Path,
         worktree_path: &Path,
         task_branch: &str,
         base_branch: &str,

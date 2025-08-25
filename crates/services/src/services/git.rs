@@ -2,8 +2,8 @@ use std::{collections::HashMap, path::Path};
 
 use chrono::{DateTime, Utc};
 use git2::{
-    BranchType, CherrypickOptions, Delta, DiffFindOptions, DiffOptions, Error as GitError,
-    FetchOptions, Repository, Sort, build::CheckoutBuilder,
+    BranchType, CherrypickOptions, Cred, Delta, DiffFindOptions, DiffOptions, Error as GitError,
+    FetchOptions, RemoteCallbacks, Repository, Sort, build::CheckoutBuilder,
 };
 use regex;
 use serde::Serialize;
