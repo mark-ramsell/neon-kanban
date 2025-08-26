@@ -39,7 +39,7 @@ import { useUserSystem } from '@/components/config-provider';
 import { GitHubLoginDialog } from '@/components/GitHubLoginDialog';
 import { TaskTemplateManager } from '@/components/TaskTemplateManager';
 import { JiraIntegrationCard } from '@/components/jira/JiraIntegrationCard';
-import { profilesApi } from '@/lib/api';
+import { profilesApi, jiraApi } from '@/lib/api';
 
 export function Settings() {
   const {
@@ -52,6 +52,7 @@ export function Settings() {
     reloadSystem,
   } = useUserSystem();
   const [saving, setSaving] = useState(false);
+  const [oauthMessage, setOauthMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { setTheme } = useTheme();
@@ -82,6 +83,35 @@ export function Settings() {
     };
     loadProfiles();
   }, []);
+
+  // Process Jira OAuth callback in Settings page (single source of truth)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    if (!code || !state) return;
+    const guardKey = `jira_oauth_code_${code}`;
+    if (sessionStorage.getItem(guardKey)) {
+      // Already processed in this tab (guards React StrictMode double-effect)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    // Mark as processed immediately to prevent duplicate exchange
+    sessionStorage.setItem(guardKey, '1');
+    (async () => {
+      try {
+        await jiraApi.oauthCallback(code, state, `${window.location.origin}/settings`);
+        setOauthMessage('Jira authorization completed.');
+        // Optionally reload system/configs if needed
+        await reloadSystem();
+      } catch (err: any) {
+        setOauthMessage(err?.message || 'Failed to complete Jira authorization.');
+      } finally {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    })();
+  }, [reloadSystem]);
+
 
 
   const playSound = async (soundFile: SoundFile) => {
@@ -226,10 +256,10 @@ export function Settings() {
           </Alert>
         )}
 
-        {success && (
+        {(success || oauthMessage) && (
           <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
             <AlertDescription className="font-medium">
-              ✓ Settings saved successfully!
+              {oauthMessage ? `✓ ${oauthMessage}` : '✓ Settings saved successfully!'}
             </AlertDescription>
           </Alert>
         )}

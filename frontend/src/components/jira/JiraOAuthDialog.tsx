@@ -38,11 +38,12 @@ type OAuthStep = 'start' | 'authorizing' | 'processing' | 'success' | 'error';
 export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDialogProps) {
   const [step, setStep] = useState<OAuthStep>('start');
   const [authUrl, setAuthUrl] = useState<string>('');
-  const [oauthState, setState] = useState<string>('');
+  const [, setState] = useState<string>('');
   const [sites, setSites] = useState<JiraResource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+  // removed exchanged handling in same-tab flow
 
   const resetDialog = useCallback(() => {
     setStep('start');
@@ -66,59 +67,9 @@ export function JiraOAuthDialog({ open, onOpenChange, onSuccess }: JiraOAuthDial
       setAuthUrl(response.authorization_url);
       setState(response.state);
       
-      // Open the authorization URL in a new window
-      window.open(response.authorization_url, '_blank', 'width=800,height=600');
-      
-      // Start polling for completion
-      setIsPolling(true);
-      const interval = setInterval(async () => {
-        try {
-          // Try to complete callback if redirected back into this window/tab
-          const params = new URLSearchParams(window.location.search);
-          const code = params.get('code');
-          const state = params.get('state');
-          if (code && state && state === oauthState) {
-            await jiraApi.oauthCallback(code, state, `${window.location.origin}/settings`);
-            // Clear URL params so we don't re-trigger
-            window.history.replaceState({}, document.title, window.location.pathname);
-          }
-
-          // Then check if we have any configs yet
-          const configs = await jiraApi.getConfigs();
-          if (configs.length > 0) {
-            // For this demo, we'll consider it successful if we have configs
-            // In production, you'd want more sophisticated callback handling
-            setIsPolling(false);
-            clearInterval(interval);
-            setPollInterval(null);
-            setStep('success');
-            setSites(configs.map(config => ({
-              id: config.cloudid,
-              name: config.site_name,
-              url: config.site_url,
-              scopes: [],
-              avatar_url: ''
-            })));
-          }
-        } catch (err) {
-          // Continue polling on error
-        }
-      }, 1500);
-      
-      setPollInterval(interval);
-      
-      // Stop polling after 5 minutes
-      setTimeout(() => {
-        if (interval) {
-          clearInterval(interval);
-          setIsPolling(false);
-          setPollInterval(null);
-          if (step === 'authorizing') {
-            setError('OAuth process timed out. Please try again.');
-            setStep('error');
-          }
-        }
-      }, 300000);
+      // Navigate in the same tab so the callback lands back here
+      window.location.assign(response.authorization_url);
+      return;
       
     } catch (err: any) {
       console.error('Failed to start OAuth:', err);

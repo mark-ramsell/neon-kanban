@@ -32,7 +32,34 @@ Sentry.setTag('source', 'frontend');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Sentry.ErrorBoundary fallback={<p>An error has occurred</p>} showDialog>
+    <Sentry.ErrorBoundary
+      fallback={(fallbackProps: { error?: unknown }) => (
+        <div style={{ padding: 16 }}>
+          <p style={{ fontWeight: 600, marginBottom: 8 }}>An error has occurred</p>
+          {(() => {
+            const err = fallbackProps?.error as { message?: string } | undefined;
+            if (err?.message) {
+              return (
+                <p style={{ color: '#b91c1c', marginBottom: 12 }}>{err.message}</p>
+              );
+            }
+            return null;
+          })()}
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '6px 10px',
+              border: '1px solid #ccc',
+              borderRadius: 6,
+              background: 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            Reload
+          </button>
+        </div>
+      )}
+    >
       <ClickToComponent />
       <App />
     </Sentry.ErrorBoundary>

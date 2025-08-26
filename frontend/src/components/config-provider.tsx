@@ -83,18 +83,23 @@ export function UserSystemProvider({ children }: UserSystemProviderProps) {
   useEffect(() => {
     if (loading) return;
     const checkToken = async () => {
-      const valid = await githubAuthApi.checkGithubToken();
-      if (valid === undefined) {
-        // Network/server error: do not update githubTokenInvalid
-        return;
-      }
-      switch (valid) {
-        case CheckTokenResponse.VALID:
-          setGithubTokenInvalid(false);
-          break;
-        case CheckTokenResponse.INVALID:
-          setGithubTokenInvalid(true);
-          break;
+      try {
+        const valid = await githubAuthApi.checkGithubToken();
+        if (valid === undefined) {
+          // Network/server error: do not update githubTokenInvalid
+          return;
+        }
+        switch (valid) {
+          case CheckTokenResponse.VALID:
+            setGithubTokenInvalid(false);
+            break;
+          case CheckTokenResponse.INVALID:
+            setGithubTokenInvalid(true);
+            break;
+        }
+      } catch (_err) {
+        // Swallow network/server errors to avoid breaking the entire app
+        // This check is non-critical and should not block the UI
       }
     };
     checkToken();

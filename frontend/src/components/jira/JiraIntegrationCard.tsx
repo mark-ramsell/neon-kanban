@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   ExternalLink, 
   Loader2, 
   CheckCircle, 
@@ -22,15 +22,15 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { jiraApi } from '@/lib/api';
-import { JiraOAuthDialog } from './JiraOAuthDialog';
+// import { JiraOAuthDialog } from './JiraOAuthDialog';
 
-interface JiraConfig {
+type ConnectedSite = {
   id: string;
-  cloudid: string;
-  site_name: string;
-  site_url: string;
-  is_active: boolean;
-}
+  name: string;
+  url: string;
+  scopes: string[];
+  avatar_url: string;
+};
 
 interface JiraConnectionStatus {
   connected: boolean;
@@ -45,17 +45,26 @@ interface JiraConnectionStatus {
 }
 
 export function JiraIntegrationCard() {
-  const [connectedSites, setConnectedSites] = useState<JiraConfig[]>([]);
+  const [connectedSites, setConnectedSites] = useState<ConnectedSite[]>([]);
   const [connectionStatuses, setConnectionStatuses] = useState<Map<string, JiraConnectionStatus>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showOAuthDialog, setShowOAuthDialog] = useState(false);
+  // Same-tab OAuth flow; no dialog state needed
   const [testingConnections, setTestingConnections] = useState<Set<string>>(new Set());
   const [refreshingTokens, setRefreshingTokens] = useState<Set<string>>(new Set());
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [credsConfigured, setCredsConfigured] = useState<boolean | null>(null);
   const [savingCreds, setSavingCreds] = useState(false);
+
+  const isValidStatus = (value: unknown): value is JiraConnectionStatus => {
+    return (
+      !!value &&
+      typeof value === 'object' &&
+      'connected' in (value as any) &&
+      'accessible_projects' in (value as any)
+    );
+  };
 
   const loadConfigs = useCallback(async () => {
     try {
@@ -68,11 +77,16 @@ export function JiraIntegrationCard() {
       } catch (e) {
         // Non-fatal for the rest of UI
       }
-      const configs = await jiraApi.getConfigs();
-      setConnectedSites(configs);
+      const sites = await jiraApi.getAccessibleSites();
+      // Normalize any backend field name differences
+      const normalized = sites.map((s) => ({
+        ...s,
+        avatar_url: (s as any).avatar_url ?? (s as any).avatarUrl ?? '',
+      }));
+      setConnectedSites(normalized);
     } catch (err: any) {
-      console.error('Failed to load Jira configs:', err);
-      setError('Failed to load Jira configurations');
+      console.error('Failed to load Jira sites:', err);
+      setError('Failed to load Jira sites');
     } finally {
       setLoading(false);
     }
@@ -82,7 +96,15 @@ export function JiraIntegrationCard() {
     try {
       setTestingConnections(prev => new Set([...prev, cloudid]));
       const status = await jiraApi.testConnection(cloudid);
-      setConnectionStatuses(prev => new Map([...prev, [cloudid, status]]));
+      const normalized: JiraConnectionStatus = isValidStatus(status)
+        ? status
+        : {
+            connected: false,
+            site_name: 'Unknown',
+            accessible_projects: 0,
+            granted_scopes: [],
+          };
+      setConnectionStatuses(prev => new Map([...prev, [cloudid, normalized]]));
     } catch (err: any) {
       console.error('Failed to test connection:', err);
       setConnectionStatuses(prev => new Map([...prev, [cloudid, {
@@ -125,7 +147,7 @@ export function JiraIntegrationCard() {
 
     try {
       await jiraApi.revokeAccess(cloudid);
-      setConnectedSites(prev => prev.filter(site => site.cloudid !== cloudid));
+      setConnectedSites(prev => prev.filter(site => site.id !== cloudid));
       setConnectionStatuses(prev => {
         const newMap = new Map(prev);
         newMap.delete(cloudid);
@@ -137,21 +159,25 @@ export function JiraIntegrationCard() {
     }
   }, []);
 
-  const handleOAuthSuccess = useCallback(async () => {
-    setShowOAuthDialog(false);
-    await loadConfigs();
-  }, [loadConfigs]);
+  const handleStartOAuth = useCallback(async () => {
+    try {
+      const resp = await jiraApi.startOAuth(`${window.location.origin}/settings`);
+      window.location.assign(resp.authorization_url);
+    } catch (e) {
+      setError('Failed to start OAuth');
+    }
+  }, []);
 
   // Load configs on mount
   useEffect(() => {
     loadConfigs();
   }, [loadConfigs]);
 
-  // Test connections for all sites on load
+  // Test connections for all sites on load (use their id as cloudid)
   useEffect(() => {
     if (connectedSites.length > 0) {
       connectedSites.forEach(site => {
-        testConnection(site.cloudid);
+        testConnection(site.id);
       });
     }
   }, [connectedSites, testConnection]);
@@ -281,23 +307,24 @@ export function JiraIntegrationCard() {
               <p className="text-muted-foreground mb-4">
                 No Jira sites connected yet
               </p>
-              <Button onClick={() => setShowOAuthDialog(true)}>
+              <Button onClick={handleStartOAuth}>
                 Connect to Jira Cloud
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               {connectedSites.map((site) => {
-                const status = connectionStatuses.get(site.cloudid);
-                const isTesting = testingConnections.has(site.cloudid);
-                const isRefreshing = refreshingTokens.has(site.cloudid);
+                const rawStatus = connectionStatuses.get(site.id);
+                const status = isValidStatus(rawStatus) ? rawStatus : undefined;
+                const isTesting = testingConnections.has(site.id);
+                const isRefreshing = refreshingTokens.has(site.id);
 
                 return (
-                  <div key={site.cloudid} className="border rounded-lg p-4">
+                  <div key={site.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-medium truncate">{site.site_name}</h4>
+                          <h4 className="font-medium truncate">{site.name}</h4>
                           {status ? (
                             status.connected ? (
                               <CheckCircle className="h-4 w-4 text-green-600" />
@@ -310,7 +337,7 @@ export function JiraIntegrationCard() {
                         </div>
                         
                         <p className="text-sm text-muted-foreground mb-2">
-                          {site.site_url}
+                          {site.url}
                         </p>
 
                         {status && (
@@ -332,13 +359,15 @@ export function JiraIntegrationCard() {
                                 {status.accessible_projects} project{status.accessible_projects !== 1 ? 's' : ''}
                               </span>
                               <Separator orientation="vertical" className="h-4" />
-                              <div className="flex flex-wrap gap-1">
-                                {status.granted_scopes.map((scope) => (
-                                  <Badge key={scope} variant="secondary" className="text-xs">
-                                    {scope}
-                                  </Badge>
-                                ))}
-                              </div>
+                              {Array.isArray(status.granted_scopes) && status.granted_scopes.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {status.granted_scopes.map((scope) => (
+                                    <Badge key={scope} variant="secondary" className="text-xs">
+                                      {scope}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -348,7 +377,7 @@ export function JiraIntegrationCard() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => testConnection(site.cloudid)}
+                          onClick={() => testConnection(site.id)}
                           disabled={isTesting}
                         >
                           {isTesting ? (
@@ -361,7 +390,7 @@ export function JiraIntegrationCard() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => refreshToken(site.cloudid)}
+                          onClick={() => refreshToken(site.id)}
                           disabled={isRefreshing}
                           title="Refresh access token"
                         >
@@ -375,7 +404,7 @@ export function JiraIntegrationCard() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => disconnectSite(site.cloudid, site.site_name)}
+                          onClick={() => disconnectSite(site.id, site.name)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -389,7 +418,7 @@ export function JiraIntegrationCard() {
 
               <Button 
                 variant="outline" 
-                onClick={() => setShowOAuthDialog(true)}
+                onClick={handleStartOAuth}
                 className="w-full"
               >
                 Connect Another Site
@@ -399,11 +428,7 @@ export function JiraIntegrationCard() {
         </CardContent>
       </Card>
 
-      <JiraOAuthDialog
-        open={showOAuthDialog}
-        onOpenChange={setShowOAuthDialog}
-        onSuccess={handleOAuthSuccess}
-      />
+      {/* Dialog removed for same-tab OAuth flow */}
     </>
   );
 }

@@ -75,7 +75,7 @@ export const JSONEditor: React.FC<JSONEditorProps> = ({
           linter(jsonParseLinter()),
           indentOnInput(),
           EditorView.lineWrapping,
-          disabled ? EditorView.editable.of(false) : [],
+          ...(disabled ? [EditorView.editable.of(false)] : []),
         ]}
         theme={getCodeMirrorTheme()}
         onChange={onChange}
